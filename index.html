@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trouver votre agence Engie - Marseille</title>
+    
+    <!-- Anti-cache pour forcer la mise à jour immédiate -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    
+    <!-- Tailwind CSS pour le design -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Leaflet CSS & JS pour la carte -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <style>
+        /* FORCER LA TRANSPARENCE DU FOND */
+        html, body {
+            background-color: transparent !important;
+        }
+
+        /* Typographie Papernest */
+        body {
+            font-family: 'Avenir', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        }
+        
+        .hide-scrollbar::-webkit-scrollbar { width: 6px; }
+        .hide-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .hide-scrollbar::-webkit-scrollbar-thumb { background-color: #E7E5E4; border-radius: 10px; }
+        
+        /* Ajustements Leaflet */
+        .leaflet-popup-content-wrapper { border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        .leaflet-container { font-family: inherit; z-index: 0; border-radius: inherit; }
+        .custom-leaflet-icon div {
+            background-color: #5A52FF; 
+            width: 22px; 
+            height: 22px; 
+            border-radius: 50%; 
+            border: 3px solid white; 
+            box-shadow: 0 3px 6px rgba(0,0,0,0.3); 
+            display: flex; 
+            align-items: center; 
+            justify-content: center;
+        }
+        .custom-leaflet-icon div::after {
+            content: '';
+            background-color: white; 
+            width: 6px; 
+            height: 6px; 
+            border-radius: 50%;
+        }
+    </style>
+</head>
+<body class="bg-transparent m-0 p-0 overflow-hidden">
+    
+    <div id="engie-app-wrapper" class="w-full flex flex-col items-center p-2">
+        <!-- Titre centré -->
+        <div class="w-full max-w-6xl mb-4 md:mb-6 text-center">
+            <h1 class="text-2xl md:text-3xl font-extrabold text-[#1C1917]">
+                Trouvez votre agence <span class="text-[#5A52FF]">Engie Home Services</span> à Marseille
+            </h1>
+        </div>
+
+        <!-- Conteneur principal -->
+        <div class="w-full max-w-6xl bg-white rounded-xl shadow-sm border border-[#E7E5E4] p-3 md:p-4 flex flex-col md:flex-row gap-4">
+            
+            <!-- Colonne de GAUCHE : Liste des adresses -->
+            <div id="location-list" class="order-2 md:order-1 w-full md:w-[350px] shrink-0 flex flex-col gap-3 max-h-[500px] overflow-y-auto hide-scrollbar">
+                <!-- Le contenu sera injecté ici -->
+            </div>
+
+            <!-- Colonne de DROITE : Carte Leaflet -->
+            <div style="transform: translateZ(0);" class="order-1 md:order-2 w-full h-[350px] md:h-[500px] md:flex-1 rounded-lg overflow-hidden border border-[#E7E5E4] relative bg-[#FAFAF9] isolate z-0">
+                <div id="map" class="absolute inset-0 w-full h-full">
+                    <div class="absolute inset-0 flex flex-col items-center justify-center text-[#79716B] gap-3 z-0">
+                        <div class="w-8 h-8 border-4 border-[#5A52FF] border-t-transparent rounded-full animate-spin"></div>
+                        <p>Chargement de la carte...</p>
+                    </div>
+                </div>
+            </div>
+            
+        </div>
+    </div>
+
+    <script>
+        // Données centrées sur Marseille et le département 13
+        const locations = [
+            { id: 1, name: "Engie Home Services Marseille Est", address: "13 Rue Gabriel Marie, 13010 Marseille", lat: 43.284200, lng: 5.401200, phone: "04 91 18 10 10", hours: "08:00 - 18:00" },
+            { id: 2, name: "Engie Home Services Marseille Nord", address: "130 Chemin de la Madrague-Ville, 13014 Marseille", lat: 43.330800, lng: 5.378900, phone: "04 91 02 15 15", hours: "08:30 - 17:30" },
+            { id: 3, name: "Engie Home Services Aix-en-Provence", address: "300 Rue Paul de Vivie, 13100 Aix-en-Provence", lat: 43.511700, lng: 5.432800, phone: "04 42 20 12 12", hours: "08:00 - 18:00" },
+            { id: 4, name: "Engie Home Services Aubagne", address: "Avenue de la Fleuride, 13400 Aubagne", lat: 43.285800, lng: 5.556400, phone: "04 42 03 04 05", hours: "09:00 - 17:30" },
+            { id: 5, name: "Engie Home Services Vitrolles", address: "Avenue de Rome, 13127 Vitrolles", lat: 43.434600, lng: 5.250500, phone: "04 42 89 90 91", hours: "08:30 - 18:00" }
+        ];
+
+        const svgPin = `<svg viewBox="0 0 24 24" fill="#FF2056" fill-opacity="0.2" stroke="#FF2056" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 mt-0.5 shrink-0"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path><circle cx="12" cy="10" r="3"></circle></svg>`;
+        const svgPhone = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 text-[#79716B] shrink-0"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>`;
+        const svgClock = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 text-[#79716B] shrink-0"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>`;
+
+        let activeLocationId = locations[0].id;
+        const markersRef = {};
+        let map;
+
+        function renderList() {
+            const listContainer = document.getElementById('location-list');
+            listContainer.innerHTML = ''; 
+
+            locations.forEach(loc => {
+                const isActive = activeLocationId === loc.id;
+                
+                const item = document.createElement('div');
+                item.className = `cursor-pointer transition-all duration-200 p-4 rounded-r-lg rounded-l-sm ${isActive ? 'bg-[#F6F5FF] border-l-4 border-[#5A52FF]' : 'bg-[#FAFAF9] border-l-4 border-transparent hover:bg-[#F6F5FF] hover:border-[#ACA8FF]'}`;
+                item.onclick = () => handleLocationClick(loc.id);
+
+                let htmlContent = `
+                    <h2 class="font-bold text-base leading-tight mb-2 ${isActive ? 'text-[#5A52FF]' : 'text-[#1C1917]'}">${loc.name}</h2>
+                    <div class="flex items-start gap-2 mt-2 text-[#79716B]">
+                        ${svgPin}
+                        <span class="text-sm leading-snug">${loc.address}</span>
+                    </div>
+                `;
+
+                if (isActive) {
+                    htmlContent += `
+                    <div class="mt-3 pt-3 border-t border-[#E7E5E4] space-y-2">
+                        <div class="flex items-center gap-2 text-[#79716B]">
+                            ${svgPhone}
+                            <span class="text-sm font-medium">${loc.phone}</span>
+                        </div>
+                        <div class="flex items-center gap-2 text-[#79716B]">
+                            ${svgClock}
+                            <span class="text-sm">${loc.hours}</span>
+                        </div>
+                    </div>`;
+                }
+
+                item.innerHTML = htmlContent;
+                listContainer.appendChild(item);
+            });
+        }
+
+        function handleLocationClick(id) {
+            activeLocationId = id;
+            const loc = locations.find(l => l.id === id);
+            const marker = markersRef[id];
+            
+            if (marker && loc) {
+                map.setView([loc.lat, loc.lng], 14); 
+                marker.openPopup(); 
+                
+                if (window.innerWidth < 768) {
+                    const mapContainer = document.getElementById('map');
+                    if (mapContainer) {
+                        mapContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                }
+            }
+            renderList(); 
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            renderList();
+            document.getElementById('map').innerHTML = '';
+
+            // Centrage initial sur Marseille
+            map = L.map('map', { zoomControl: false }).setView([43.2965, 5.3698], 11);
+            L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; OpenStreetMap &copy; CARTO',
+                subdomains: 'abcd',
+                maxZoom: 20
+            }).addTo(map);
+
+            const customIcon = L.divIcon({
+                className: 'custom-leaflet-icon',
+                html: `<div></div>`, 
+                iconSize: [22, 22],
+                iconAnchor: [11, 11],
+                popupAnchor: [0, -11]
+            });
+
+            locations.forEach(loc => {
+                const marker = L.marker([loc.lat, loc.lng], { icon: customIcon }).addTo(map);
+                
+                marker.bindPopup(`
+                    <div style="font-family: 'Avenir', -apple-system, sans-serif; color: #1C1917; padding: 2px;">
+                    <h3 style="margin: 0 0 4px 0; font-weight: bold; color: #5A52FF; font-size: 15px;">${loc.name}</h3>
+                    <p style="margin: 0; font-size: 13px;">${loc.address}</p>
+                    </div>
+                `);
+
+                marker.on('click', () => handleLocationClick(loc.id));
+                markersRef[loc.id] = marker;
+            });
+            
+            if (markersRef[locations[0].id]) {
+                markersRef[locations[0].id].openPopup();
+            }
+
+            setTimeout(() => {
+                if(map) map.invalidateSize();
+            }, 300);
+
+            window.addEventListener('resize', () => {
+                if(map) map.invalidateSize();
+            });
+
+            // Envoi de la taille dynamique à l'iframe parente
+            const wrapper = document.getElementById('engie-app-wrapper');
+            if (wrapper) {
+                const resizeObserver = new ResizeObserver(() => {
+                    const newHeight = wrapper.offsetHeight + 20;
+                    window.parent.postMessage({ type: 'engie-locator-resize', height: newHeight }, '*');
+                });
+                resizeObserver.observe(wrapper);
+            }
+        });
+    </script>
+</body>
+</html>
